@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 )
 
@@ -52,7 +51,7 @@ func main() {
 		UpstreamServers: config.UpstreamServers,
 	})
 
-	handleReport := func(res http.ResponseWriter, req *http.Request) {
+	handleIndex := func(res http.ResponseWriter, req *http.Request) {
 		vars := mux.Vars(req)
 		channel := vars["channel"]
 
@@ -92,14 +91,8 @@ func main() {
 	}
 
 	router := mux.NewRouter()
-	router.HandleFunc("/hls/{channel}/index.m3u8", handleReport).Methods("GET")
-
-	corsHeaders := handlers.AllowedHeaders([]string{"X-Requested-With", "Content-Type", "Origin"})
-	corsMaxAge := handlers.MaxAge(86400)
-	corsOrigins := handlers.AllowedOrigins([]string{"*"})
-	corsMethods := handlers.AllowedMethods([]string{"GET", "OPTIONS"})
-	corsMiddleware := handlers.CORS(corsHeaders, corsMaxAge, corsOrigins, corsMethods)
+	router.HandleFunc("/hls/{channel}/index.m3u8", handleIndex).Methods("GET")
 
 	log.Printf("listening on: %s", config.HTTPAddress)
-	log.Fatal(http.ListenAndServe(config.HTTPAddress, corsMiddleware(router)))
+	log.Fatal(http.ListenAndServe(config.HTTPAddress, router))
 }

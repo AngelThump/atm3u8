@@ -20,30 +20,30 @@ type WeightedRandomBalancerConfig struct {
 
 // WeightedRandomBalancer ...
 type WeightedRandomBalancer struct {
-	entries []WeightedRandomBalancerEntry
-	sum     float64
+	entries   []WeightedRandomBalancerEntry
+	weightSum float64
 }
 
 // NewWeightedRandomBalancer ...
 func NewWeightedRandomBalancer(config WeightedRandomBalancerConfig) *WeightedRandomBalancer {
-	var sum float64
+	var weightSum float64
 	for _, entry := range config.ProxyServers {
-		sum += entry.Weight
+		weightSum += entry.Weight
 	}
-	if sum == 0 {
+	if weightSum == 0 {
 		log.Fatal("all servers have zero weight")
 	}
 
 	log.Printf("created weighted random load balancer with %d servers", len(config.ProxyServers))
 	return &WeightedRandomBalancer{
-		entries: config.ProxyServers,
-		sum:     sum,
+		entries:   config.ProxyServers,
+		weightSum: weightSum,
 	}
 }
 
 // RouteSegment ...
 func (r *WeightedRandomBalancer) RouteSegment(channel, chunk string) (string, error) {
-	v := rand.Float64() * r.sum
+	v := rand.Float64() * r.weightSum
 
 	for _, entry := range r.entries {
 		if v < entry.Weight {

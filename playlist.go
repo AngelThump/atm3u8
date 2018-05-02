@@ -59,11 +59,10 @@ func (p *Playlist) Load() error {
 	defer p.loaderLock.Unlock()
 
 	if p.Stale() {
-		atomic.StoreInt64(&p.lastModified, time.Now().UnixNano())
+		requestTime := time.Now().UnixNano()
 
 		playlist, err := p.loader.Get(p.channel)
 		if err != nil {
-			atomic.StoreInt64(&p.lastModified, 0)
 			return fmt.Errorf("error loading playlist: %v", err)
 		}
 
@@ -73,6 +72,8 @@ func (p *Playlist) Load() error {
 
 		durationNanos := playlist.TargetDuration * float64(time.Second/time.Nanosecond)
 		atomic.StoreInt64(&p.duration, int64(durationNanos))
+
+		atomic.StoreInt64(&p.lastModified, requestTime)
 	}
 
 	return nil
