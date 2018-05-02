@@ -33,7 +33,9 @@ func (p *PlaylistService) Load(channel string) (*Playlist, error) {
 		p.valuesLock.Unlock()
 	}
 
-	value.Load()
+	if err := value.Load(); err != nil {
+		return nil, err
+	}
 
 	return value, nil
 }

@@ -9,8 +9,8 @@ import (
 
 // WeightedRandomBalancerEntry ...
 type WeightedRandomBalancerEntry struct {
-	Address string
-	Weight  float64
+	Address string  `yml:"address"`
+	Weight  float64 `yml:"weight"`
 }
 
 // WeightedRandomBalancerConfig ...
@@ -46,7 +46,7 @@ func (r *WeightedRandomBalancer) RouteSegment(channel, chunk string) (string, er
 	v := rand.Float64() * r.sum
 
 	for _, entry := range r.entries {
-		if v > entry.Weight {
+		if v < entry.Weight {
 			return fmt.Sprintf("%s/hls/%s/%s", entry.Address, channel, chunk), nil
 		}
 		v -= entry.Weight

@@ -25,6 +25,7 @@ func readProxyConfig(config interface{}) {
 
 func main() {
 	flag.Parse()
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	var config AppConfig
 	if err := ReadYAMLConfig(configPath, &config); err != nil {
@@ -57,6 +58,8 @@ func main() {
 
 		playlist, err := playlists.Load(channel)
 		if err != nil {
+			log.Printf("error loading channel %s: %v", channel, err)
+
 			res.WriteHeader(503)
 			res.Write([]byte(err.Error()))
 			return

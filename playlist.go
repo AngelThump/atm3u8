@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -62,6 +63,7 @@ func (p *Playlist) Load() error {
 
 		playlist, err := p.loader.Get(p.channel)
 		if err != nil {
+			atomic.StoreInt64(&p.lastModified, 0)
 			return fmt.Errorf("error loading playlist: %v", err)
 		}
 
@@ -81,6 +83,10 @@ func (p *Playlist) Route(router LoadBalancer) (*m3u8.MediaPlaylist, error) {
 	p.valueLock.RLock()
 	value := p.value
 	p.valueLock.RUnlock()
+
+	if value == nil {
+		return nil, errors.New("playlist not loaded")
+	}
 
 	playlist := *value
 	playlist.Segments = make([]*m3u8.MediaSegment, int(value.Count()))
