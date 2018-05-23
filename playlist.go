@@ -80,7 +80,7 @@ func (p *Playlist) Load() error {
 }
 
 // Route ...
-func (p *Playlist) Route(router LoadBalancer) (*m3u8.MediaPlaylist, error) {
+func (p *Playlist) Route(sessionKey string, router LoadBalancer) (*m3u8.MediaPlaylist, error) {
 	p.valueLock.RLock()
 	value := p.value
 	p.valueLock.RUnlock()
@@ -95,7 +95,7 @@ func (p *Playlist) Route(router LoadBalancer) (*m3u8.MediaPlaylist, error) {
 	for i := uint(0); i < value.Count(); i++ {
 		segment := *value.Segments[i]
 
-		uri, err := router.RouteSegment(p.channel, segment.URI)
+		uri, err := router.RouteSegment(sessionKey, p.channel, segment.URI)
 		if err != nil {
 			return nil, err
 		}

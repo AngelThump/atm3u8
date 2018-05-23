@@ -28,7 +28,7 @@ func NewRoundRobinBalancer(config RoundRobinBalancerConfig) *RoundRobinBalancer 
 }
 
 // RouteSegment ...
-func (r *RoundRobinBalancer) RouteSegment(channel, chunk string) (string, error) {
+func (r *RoundRobinBalancer) RouteSegment(sessionKey, channel, chunk string) (string, error) {
 	index := atomic.AddUint64(&r.nextIndex, 1) % uint64(len(r.servers))
 	return fmt.Sprintf("%s/hls/%s/%s", r.servers[index], channel, chunk), nil
 }

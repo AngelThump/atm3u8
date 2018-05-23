@@ -11,6 +11,7 @@ type AppConfig struct {
 	HTTPAddress     string   `yaml:"httpAddress"`
 	UpstreamServers []string `yaml:"upstreamServers"`
 	ProxyStrategy   string   `yaml:"proxyStrategy"`
+	IPHeaderName    string   `yaml:"ipHeaderName"`
 }
 
 // ReadYAMLConfig ...

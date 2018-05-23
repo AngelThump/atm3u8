@@ -42,7 +42,7 @@ func NewWeightedRandomBalancer(config WeightedRandomBalancerConfig) *WeightedRan
 }
 
 // RouteSegment ...
-func (r *WeightedRandomBalancer) RouteSegment(channel, chunk string) (string, error) {
+func (r *WeightedRandomBalancer) RouteSegment(sessionKey, channel, chunk string) (string, error) {
 	v := rand.Float64() * r.weightSum
 
 	for _, entry := range r.entries {

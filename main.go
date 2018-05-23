@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 )
 
@@ -43,6 +44,11 @@ func main() {
 		readProxyConfig(&balancerConfig)
 		playlistBalancer = NewRoundRobinBalancer(balancerConfig)
 
+	case "CONSISTENT_HASH":
+		var balancerConfig ConsistentHashBalancerConfig
+		readProxyConfig(&balancerConfig)
+		playlistBalancer = NewConsistentHashBalancer(balancerConfig)
+
 	default:
 		log.Fatalf("invalid proxy strategy: %s", config.ProxyStrategy)
 	}
@@ -73,7 +79,14 @@ func main() {
 			return
 		}
 
-		routedPlaylist, err := playlist.Route(playlistBalancer)
+		var sessionKey string
+		if config.IPHeaderName == "" {
+			sessionKey = req.RemoteAddr
+		} else {
+			sessionKey = req.Header.Get(config.IPHeaderName)
+		}
+
+		routedPlaylist, err := playlist.Route(sessionKey, playlistBalancer)
 		if err != nil {
 			res.WriteHeader(500)
 			res.Write([]byte(err.Error()))
@@ -94,5 +107,12 @@ func main() {
 	router.HandleFunc("/hls/{channel}/index.m3u8", handleIndex).Methods("GET")
 
 	log.Printf("listening on: %s", config.HTTPAddress)
-	log.Fatal(http.ListenAndServe(config.HTTPAddress, router))
+
+	corsHeaders := handlers.AllowedHeaders([]string{"Content-Type", "Origin"})
+	corsMaxAge := handlers.MaxAge(86400)
+	corsOrigins := handlers.AllowedOrigins([]string{"*"})
+	corsMethods := handlers.AllowedMethods([]string{"POST", "OPTIONS"})
+	corsMiddleware := handlers.CORS(corsHeaders, corsMaxAge, corsOrigins, corsMethods)
+
+	log.Fatal(http.ListenAndServe(config.HTTPAddress, corsMiddleware(router)))
 }
