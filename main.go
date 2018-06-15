@@ -110,8 +110,15 @@ func main() {
 
 	corsHeaders := handlers.AllowedHeaders([]string{"Content-Type", "Origin"})
 	corsMaxAge := handlers.MaxAge(86400)
-	corsOrigins := handlers.AllowedOrigins([]string{"*"})
-	corsMethods := handlers.AllowedMethods([]string{"POST", "OPTIONS"})
+
+	var corsOrigins handlers.CORSOption
+	if len(config.CORSOrigins) != 0 {
+		corsOrigins = handlers.AllowedOrigins(config.CORSOrigins)
+	} else {
+		corsOrigins = handlers.AllowedOrigins([]string{"*"})
+	}
+
+	corsMethods := handlers.AllowedMethods([]string{"GET", "OPTIONS"})
 	corsMiddleware := handlers.CORS(corsHeaders, corsMaxAge, corsOrigins, corsMethods)
 
 	log.Fatal(http.ListenAndServe(config.HTTPAddress, corsMiddleware(router)))

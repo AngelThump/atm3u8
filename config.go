@@ -12,6 +12,7 @@ type AppConfig struct {
 	UpstreamServers []string `yaml:"upstreamServers"`
 	ProxyStrategy   string   `yaml:"proxyStrategy"`
 	IPHeaderName    string   `yaml:"ipHeaderName"`
+	CORSOrigins     []string `yaml:"corsOrigins"`
 }
 
 // ReadYAMLConfig ...
