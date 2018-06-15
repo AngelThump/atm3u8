@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 )
 
@@ -103,23 +102,37 @@ func main() {
 		res.Write(buf.Bytes())
 	}
 
+	handleOptions := func(res http.ResponseWriter, req *http.Request) {
+		res.WriteHeader(200)
+		res.Write([]byte{})
+	}
+
+	handleCors := func(handler http.HandlerFunc) http.HandlerFunc {
+		return func(res http.ResponseWriter, req *http.Request) {
+			if len(config.CORSOrigins) == 0 {
+				res.Header().Add("Access-Control-Allow-Origin", "*")
+			} else {
+				for _, origin := range config.CORSOrigins {
+					if req.Header.Get("Origin") == origin {
+						res.Header().Add("Access-Control-Allow-Origin", origin)
+						break
+					}
+				}
+			}
+
+			res.Header().Add("Access-Control-Allow-Headers", "Content-Type,Origin")
+			res.Header().Add("Access-Control-Allow-Methods", "GET,OPTIONS")
+			res.Header().Add("Access-Control-Max-Age", "86400")
+
+			handler(res, req)
+		}
+	}
+
 	router := mux.NewRouter()
-	router.HandleFunc("/hls/{channel}/index.m3u8", handleIndex).Methods("GET")
+	router.HandleFunc("/hls/{channel}/index.m3u8", handleCors(handleIndex)).Methods("GET")
+	router.HandleFunc("/hls/{channel}/index.m3u8", handleCors(handleOptions)).Methods("OPTIONS")
 
 	log.Printf("listening on: %s", config.HTTPAddress)
 
-	corsHeaders := handlers.AllowedHeaders([]string{"Content-Type", "Origin"})
-	corsMaxAge := handlers.MaxAge(86400)
-
-	var corsOrigins handlers.CORSOption
-	if len(config.CORSOrigins) != 0 {
-		corsOrigins = handlers.AllowedOrigins(config.CORSOrigins)
-	} else {
-		corsOrigins = handlers.AllowedOrigins([]string{"*"})
-	}
-
-	corsMethods := handlers.AllowedMethods([]string{"GET", "OPTIONS"})
-	corsMiddleware := handlers.CORS(corsHeaders, corsMaxAge, corsOrigins, corsMethods)
-
-	log.Fatal(http.ListenAndServe(config.HTTPAddress, corsMiddleware(router)))
+	log.Fatal(http.ListenAndServe(config.HTTPAddress, router))
 }
