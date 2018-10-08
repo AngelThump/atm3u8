@@ -1,30 +1,23 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"math"
 	"math/rand"
 	"sort"
+	"sync"
 
 	"github.com/spaolacci/murmur3"
 )
 
-// ConsistentHashBalancerEntry ...
-type ConsistentHashBalancerEntry struct {
-	Address string  `yml:"address"`
-	Weight  float64 `yml:"weight"`
-}
-
 // ConsistentHashBalancerConfig ...
 type ConsistentHashBalancerConfig struct {
-	ReplicationFactor int                            `yaml:"replicationFactor"`
-	ProxyServers      []*ConsistentHashBalancerEntry `yaml:"proxyServers"`
+	ReplicationFactor int `yaml:"replicationFactor"`
 }
 
 type consistentHashBalancerRingEntry struct {
-	key   uint32
-	value *ConsistentHashBalancerEntry
+	key    uint32
+	domain *string
 }
 
 type consistentHashBalancerRing []consistentHashBalancerRingEntry
@@ -43,40 +36,97 @@ func (c consistentHashBalancerRing) Swap(i, j int) {
 
 // ConsistentHashBalancer ...
 type ConsistentHashBalancer struct {
-	hashRing []consistentHashBalancerRingEntry
+	config         ConsistentHashBalancerConfig
+	hashRingLock   sync.RWMutex
+	hashRingLength int
+	hashRing       []consistentHashBalancerRingEntry
+	domainSet      map[string]struct{}
 }
 
 // NewConsistentHashBalancer ...
-func NewConsistentHashBalancer(config ConsistentHashBalancerConfig) *ConsistentHashBalancer {
-	var weightSum float64
-	for _, entry := range config.ProxyServers {
-		weightSum += entry.Weight
-	}
-	if weightSum == 0 {
-		log.Fatal("all servers have zero weight")
-	}
-
+func NewConsistentHashBalancer(config ConsistentHashBalancerConfig, proxyEvents chan *ProxyStatusEvent) *ConsistentHashBalancer {
 	if config.ReplicationFactor == 0 {
 		log.Fatal("replication factor is zero")
 	}
 
-	c := &ConsistentHashBalancer{}
-	ringSize := config.ReplicationFactor * len(config.ProxyServers)
-	for _, entry := range config.ProxyServers {
-		replicaCount := int((entry.Weight / weightSum) * float64(ringSize))
-		for i := 0; i < replicaCount; i++ {
-			ringEntry := consistentHashBalancerRingEntry{
-				key:   uint32(rand.Int63n(math.MaxUint32)),
-				value: entry,
-			}
-			c.hashRing = append(c.hashRing, ringEntry)
+	r := &ConsistentHashBalancer{
+		config:    config,
+		domainSet: map[string]struct{}{},
+	}
+	go r.consumeEvents(proxyEvents)
+
+	return r
+}
+
+func (r *ConsistentHashBalancer) consumeEvents(proxyEvents chan *ProxyStatusEvent) {
+	for event := range proxyEvents {
+		switch event.Status {
+		case ProxyStatusOK:
+			r.addDomain(event.Domain)
+		case ProxyStatusRemoved:
+			fallthrough
+		case ProxyStatusDown:
+			r.removeDomain(event.Domain)
+		}
+	}
+}
+
+func (r *ConsistentHashBalancer) addDomain(domain string) {
+	if _, ok := r.domainSet[domain]; ok {
+		return
+	}
+	r.domainSet[domain] = struct{}{}
+
+	newHashRingLength := r.hashRingLength + r.config.ReplicationFactor
+	hashRing := make([]consistentHashBalancerRingEntry, r.hashRingLength, newHashRingLength)
+	r.hashRingLength = newHashRingLength
+
+	r.hashRingLock.RLock()
+	copy(hashRing, r.hashRing)
+	r.hashRingLock.RUnlock()
+
+	for i := 0; i < r.config.ReplicationFactor; i++ {
+		ringEntry := consistentHashBalancerRingEntry{
+			key:    uint32(rand.Int63n(math.MaxUint32)),
+			domain: &domain,
+		}
+		hashRing = append(hashRing, ringEntry)
+	}
+
+	sort.Sort(consistentHashBalancerRing(hashRing))
+
+	r.hashRingLock.Lock()
+	r.hashRing = hashRing
+	r.hashRingLock.Unlock()
+
+	log.Printf("added %s to router", domain)
+}
+
+func (r *ConsistentHashBalancer) removeDomain(domain string) {
+	if _, ok := r.domainSet[domain]; !ok {
+		return
+	}
+	delete(r.domainSet, domain)
+
+	hashRing := make([]consistentHashBalancerRingEntry, r.hashRingLength)
+	r.hashRingLength -= r.config.ReplicationFactor
+
+	r.hashRingLock.RLock()
+	copy(hashRing, r.hashRing)
+	r.hashRingLock.RUnlock()
+
+	filteredHashRing := make([]consistentHashBalancerRingEntry, 0, r.hashRingLength)
+	for _, entry := range hashRing {
+		if *entry.domain != domain {
+			filteredHashRing = append(filteredHashRing, entry)
 		}
 	}
 
-	sort.Sort(consistentHashBalancerRing(c.hashRing))
+	r.hashRingLock.Lock()
+	r.hashRing = filteredHashRing
+	r.hashRingLock.Unlock()
 
-	log.Printf("created consistent hash load balancer with %d servers", len(config.ProxyServers))
-	return c
+	log.Printf("added %s to router", domain)
 }
 
 // RouteSegment ...
@@ -86,10 +136,15 @@ func (r *ConsistentHashBalancer) RouteSegment(sessionKey, channel, chunk string)
 	hash.Write([]byte(chunk))
 	key := hash.Sum32()
 
+	r.hashRingLock.RLock()
+
 	i := sort.Search(len(r.hashRing), func(i int) bool { return r.hashRing[i].key > key })
 	if i == len(r.hashRing) {
 		i = 0
 	}
+	url := "https://" + *r.hashRing[i].domain + "/hls/" + channel + "/" + chunk
 
-	return fmt.Sprintf("%s/hls/%s/%s", r.hashRing[i].value.Address, channel, chunk), nil
+	r.hashRingLock.RUnlock()
+
+	return url, nil
 }

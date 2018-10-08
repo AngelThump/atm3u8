@@ -31,26 +31,14 @@ func main() {
 		log.Fatalf("error reading config: %v", err)
 	}
 
-	var playlistBalancer LoadBalancer
-	switch config.ProxyStrategy {
-	case "WEIGHTED_RANDOM":
-		var balancerConfig WeightedRandomBalancerConfig
-		readProxyConfig(&balancerConfig)
-		playlistBalancer = NewWeightedRandomBalancer(balancerConfig)
+	proxyEvents := make(chan *ProxyStatusEvent)
+	proxyLoader := NewProxyLoader(config.ProxyLoader)
+	proxyLoader.Notify(proxyEvents)
+	go proxyLoader.Start()
 
-	case "ROUND_ROBIN":
-		var balancerConfig RoundRobinBalancerConfig
-		readProxyConfig(&balancerConfig)
-		playlistBalancer = NewRoundRobinBalancer(balancerConfig)
-
-	case "CONSISTENT_HASH":
-		var balancerConfig ConsistentHashBalancerConfig
-		readProxyConfig(&balancerConfig)
-		playlistBalancer = NewConsistentHashBalancer(balancerConfig)
-
-	default:
-		log.Fatalf("invalid proxy strategy: %s", config.ProxyStrategy)
-	}
+	var balancerConfig ConsistentHashBalancerConfig
+	readProxyConfig(&balancerConfig)
+	playlistBalancer := NewConsistentHashBalancer(balancerConfig, proxyEvents)
 
 	playlists := NewPlaylistService(&PlaylistLoader{
 		UpstreamServers: config.UpstreamServers,
@@ -94,7 +82,7 @@ func main() {
 
 		buf := routedPlaylist.Encode()
 
-		res.Header().Add("Last-Modified", lastModified.Format(time.RFC1123))
+		res.Header().Add("Last-Modified", lastModified.UTC().Format(time.RFC1123))
 		res.Header().Add("Max-Age", strconv.FormatInt(int64(playlist.TargetDuration()/time.Second), 10))
 		res.Header().Add("Content-Type", "application/vnd.apple.mpegurl")
 		res.Header().Set("Content-Length", strconv.FormatInt(int64(buf.Len()), 10))

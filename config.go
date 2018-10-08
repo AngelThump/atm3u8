@@ -8,11 +8,11 @@ import (
 
 // AppConfig ...
 type AppConfig struct {
-	HTTPAddress     string   `yaml:"httpAddress"`
-	UpstreamServers []string `yaml:"upstreamServers"`
-	ProxyStrategy   string   `yaml:"proxyStrategy"`
-	IPHeaderName    string   `yaml:"ipHeaderName"`
-	CORSOrigins     []string `yaml:"corsOrigins"`
+	HTTPAddress     string            `yaml:"httpAddress"`
+	UpstreamServers []string          `yaml:"upstreamServers"`
+	IPHeaderName    string            `yaml:"ipHeaderName"`
+	CORSOrigins     []string          `yaml:"corsOrigins"`
+	ProxyLoader     ProxyLoaderConfig `yaml:"proxyLoader"`
 }
 
 // ReadYAMLConfig ...
