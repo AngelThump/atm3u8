@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"log"
 	"math"
 	"math/rand"
@@ -9,6 +10,9 @@ import (
 
 	"github.com/spaolacci/murmur3"
 )
+
+// ErrNoServers ...
+var ErrNoServers = errors.New("no servers found")
 
 // ConsistentHashBalancerConfig ...
 type ConsistentHashBalancerConfig struct {
@@ -53,12 +57,12 @@ func NewConsistentHashBalancer(config ConsistentHashBalancerConfig, proxyEvents 
 		config:    config,
 		domainSet: map[string]struct{}{},
 	}
-	go r.consumeEvents(proxyEvents)
+	go r.handleProxyEvents(proxyEvents)
 
 	return r
 }
 
-func (r *ConsistentHashBalancer) consumeEvents(proxyEvents chan *ProxyStatusEvent) {
+func (r *ConsistentHashBalancer) handleProxyEvents(proxyEvents chan *ProxyStatusEvent) {
 	for event := range proxyEvents {
 		switch event.Status {
 		case ProxyStatusOK:
@@ -137,14 +141,17 @@ func (r *ConsistentHashBalancer) RouteSegment(sessionKey, channel, chunk string)
 	key := hash.Sum32()
 
 	r.hashRingLock.RLock()
+	defer r.hashRingLock.RUnlock()
+
+	if len(r.hashRing) == 0 {
+		return "", ErrNoServers
+	}
 
 	i := sort.Search(len(r.hashRing), func(i int) bool { return r.hashRing[i].key > key })
 	if i == len(r.hashRing) {
 		i = 0
 	}
 	url := "https://" + *r.hashRing[i].domain + "/hls/" + channel + "/" + chunk
-
-	r.hashRingLock.RUnlock()
 
 	return url, nil
 }
