@@ -89,6 +89,10 @@ func (r *ConsistentHashBalancer) addDomain(domain string) {
 	copy(hashRing, r.hashRing)
 	r.hashRingLock.RUnlock()
 
+	hash := murmur3.New64()
+	hash.Write([]byte(domain))
+	rand.Seed(int64(hash.Sum64() & math.MaxInt64))
+
 	for i := 0; i < r.config.ReplicationFactor; i++ {
 		ringEntry := consistentHashBalancerRingEntry{
 			key:    uint32(rand.Int63n(math.MaxUint32)),
