@@ -88,6 +88,7 @@ type ProxyLivenessChecker struct {
 	domain            string
 	url               string
 	ticker            *time.Ticker
+	stop              chan struct{}
 	statusLock        sync.Mutex
 	status            ProxyStatus
 	statusStableCount int64
@@ -102,6 +103,7 @@ func NewProxyLivenessChecker(config LivenessCheckConfig, statusNotifier *proxySt
 		statusNotifier: statusNotifier,
 		domain:         domain,
 		url:            fmt.Sprintf(config.URLFormat, domain),
+		stop:           make(chan struct{}, 1),
 	}
 }
 
@@ -147,7 +149,7 @@ func (p *ProxyLivenessChecker) Start() {
 	}
 	p.ticker = time.NewTicker(p.config.IntervalSeconds * time.Second)
 
-	for ; true; <-p.ticker.C {
+	for {
 		_, err := http.Head(p.url)
 		if err != nil {
 			p.updateStatus(ProxyStatusDown)
@@ -166,12 +168,19 @@ func (p *ProxyLivenessChecker) Start() {
 			p.lastEmittedStatus = status
 			p.statusNotifier.EmitNotification(p.domain, status)
 		}
+
+		select {
+		case <-p.ticker.C:
+		case <-p.stop:
+			break
+		}
 	}
 }
 
 // Stop ...
 func (p *ProxyLivenessChecker) Stop() {
 	p.ticker.Stop()
+	p.stop <- struct{}{}
 }
 
 type proxy struct {
@@ -185,6 +194,7 @@ type ProxyLoader struct {
 	proxyStatusNotifier
 	config  ProxyLoaderConfig
 	ticker  *time.Ticker
+	stop    chan struct{}
 	proxies map[string]*proxy
 }
 
@@ -192,6 +202,7 @@ type ProxyLoader struct {
 func NewProxyLoader(config ProxyLoaderConfig) *ProxyLoader {
 	return &ProxyLoader{
 		config:  config,
+		stop:    make(chan struct{}, 1),
 		proxies: map[string]*proxy{},
 	}
 }
@@ -203,10 +214,16 @@ func (p *ProxyLoader) Start() {
 	}
 	p.ticker = time.NewTicker(p.config.APIRefreshIntervalSeconds * time.Second)
 
-	for ; true; <-p.ticker.C {
+	for {
 		subdomains, err := p.loadSubdomains()
 		if err == nil {
 			p.updateProxies(subdomains)
+		}
+
+		select {
+		case <-p.ticker.C:
+		case <-p.stop:
+			break
 		}
 	}
 }
@@ -214,6 +231,7 @@ func (p *ProxyLoader) Start() {
 // Stop ...
 func (p *ProxyLoader) Stop() {
 	p.ticker.Stop()
+	p.stop <- struct{}{}
 }
 
 func (p *ProxyLoader) loadSubdomains() ([]string, error) {

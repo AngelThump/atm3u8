@@ -2,8 +2,8 @@ package main
 
 import "testing"
 
-// BenchmarkBigLen ...
-func BenchmarkBigLen(b *testing.B) {
+// BenchmarkRouteSegment ...
+func BenchmarkRouteSegment(b *testing.B) {
 	config := ConsistentHashBalancerConfig{
 		ReplicationFactor: 1000,
 	}
