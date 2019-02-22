@@ -143,6 +143,7 @@ func (r *ConsistentHashBalancer) RouteSegment(sessionKey, channel, chunk string)
 	hash.Write([]byte(sessionKey))
 	hash.Write([]byte(chunk))
 	key := hash.Sum32()
+	log.Println(sessionKey, chunk, key)
 
 	r.hashRingLock.RLock()
 	defer r.hashRingLock.RUnlock()
@@ -151,7 +152,7 @@ func (r *ConsistentHashBalancer) RouteSegment(sessionKey, channel, chunk string)
 		return "", ErrNoServers
 	}
 
-	i := sort.Search(len(r.hashRing), func(i int) bool { return r.hashRing[i].key > key })
+	i := sort.Search(len(r.hashRing), func(i int) bool { return r.hashRing[i].key >= key })
 	if i == len(r.hashRing) {
 		i = 0
 	}
