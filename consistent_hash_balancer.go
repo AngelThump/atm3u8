@@ -151,7 +151,7 @@ func (r *ConsistentHashBalancer) RouteSegment(sessionKey, channel, chunk string)
 		return "", ErrNoServers
 	}
 
-	i := sort.Search(len(r.hashRing), func(i int) bool { return r.hashRing[i].key > key })
+	i := sort.Search(len(r.hashRing), func(i int) bool { return r.hashRing[i].key >= key })
 	if i == len(r.hashRing) {
 		i = 0
 	}
