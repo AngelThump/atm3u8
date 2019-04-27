@@ -10,20 +10,19 @@ import (
 	"github.com/grafov/m3u8"
 )
 
-// CacheTTL playlist cache entry ttl
-const CacheTTL = time.Second
-
 // PlaylistService ...
 type PlaylistService struct {
 	loader    *PlaylistLoader
+	cacheTTL  time.Duration
 	cacheLock sync.RWMutex
 	cache     map[playlistCacheKey]*playlistCacheEntry
 }
 
 // NewPlaylistService ...
-func NewPlaylistService(loader *PlaylistLoader) *PlaylistService {
+func NewPlaylistService(loader *PlaylistLoader, cacheTTL time.Duration) *PlaylistService {
 	p := &PlaylistService{
 		loader: loader,
+		cacheTTL: cacheTTL,
 		cache:  make(map[playlistCacheKey]*playlistCacheEntry),
 	}
 
@@ -48,7 +47,7 @@ func (p *PlaylistService) Load(channel string, listType m3u8.ListType) (m3u8.Pla
 		p.cacheLock.Unlock()
 	}
 
-	if err := cacheEntry.Load(); err != nil {
+	if err := cacheEntry.Load(p.cacheTTL); err != nil {
 		log.Printf("error loading channel %s: %v", channel, err)
 		return nil, err
 	}
@@ -87,19 +86,19 @@ func (p *playlistCacheEntry) Age() time.Duration {
 	return time.Since(p.LastModified())
 }
 
-func (p *playlistCacheEntry) Stale() bool {
-	return p.Age() >= CacheTTL
+func (p *playlistCacheEntry) Stale(ttl time.Duration) bool {
+	return p.Age() >= ttl
 }
 
-func (p *playlistCacheEntry) Load() error {
-	if !p.Stale() {
+func (p *playlistCacheEntry) Load(ttl time.Duration) error {
+	if !p.Stale(ttl) {
 		return nil
 	}
 
 	p.loaderLock.Lock()
 	defer p.loaderLock.Unlock()
 
-	if p.Stale() {
+	if p.Stale(ttl) {
 		requestTime := time.Now().UnixNano()
 
 		playlist, err := p.loader.Get(p.channel, p.listType)

@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"time"
 
 	yaml "gopkg.in/yaml.v2"
 )
@@ -10,6 +11,7 @@ import (
 type AppConfig struct {
 	HTTPAddress     string            `yaml:"httpAddress"`
 	UpstreamServers []string          `yaml:"upstreamServers"`
+	CacheTTL        time.Duration     `yaml:"cacheTTL"`
 	IPHeaderName    string            `yaml:"ipHeaderName"`
 	CORSOrigins     []string          `yaml:"corsOrigins"`
 	ProxyLoader     ProxyLoaderConfig `yaml:"proxyLoader"`

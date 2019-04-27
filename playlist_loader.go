@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/grafov/m3u8"
 )
@@ -12,6 +13,7 @@ import (
 // PlaylistLoader ...
 type PlaylistLoader struct {
 	UpstreamServers []string
+	CacheTTL        time.Duration
 }
 
 func (p *PlaylistLoader) get(url string, expectedPlaylistType m3u8.ListType) (m3u8.Playlist, error) {

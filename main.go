@@ -139,9 +139,12 @@ func main() {
 
 	server := playlistServer{
 		Config: config,
-		Playlists: NewPlaylistService(&PlaylistLoader{
-			UpstreamServers: config.UpstreamServers,
-		}),
+		Playlists: NewPlaylistService(
+			&PlaylistLoader{
+				UpstreamServers: config.UpstreamServers,
+			},
+			config.CacheTTL,
+		),
 		Balancer: balancer,
 	}
 
