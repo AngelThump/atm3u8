@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"log"
 	"net"
@@ -24,9 +25,10 @@ func readProxyConfig(config interface{}) {
 }
 
 type playlistServer struct {
-	Config    AppConfig
-	Playlists *PlaylistService
-	Balancer  LoadBalancer
+	Config      AppConfig
+	Playlists   *PlaylistService
+	Balancer    LoadBalancer
+	ProxyLoader *ProxyLoader
 }
 
 func (p *playlistServer) HandlerFunc() http.HandlerFunc {
@@ -35,6 +37,7 @@ func (p *playlistServer) HandlerFunc() http.HandlerFunc {
 	router.HandleFunc("/hls/{channel}.m3u8", p.CORSHandlerFunc(p.HandleOptions)).Methods("OPTIONS")
 	router.HandleFunc("/hls/{channel}/index.m3u8", p.CORSHandlerFunc(p.HandleMediaPlaylist)).Methods("GET")
 	router.HandleFunc("/hls/{channel}/index.m3u8", p.CORSHandlerFunc(p.HandleOptions)).Methods("OPTIONS")
+	router.HandleFunc("/api/v1/status", p.CORSHandlerFunc(p.HandleStatus)).Methods("GET")
 
 	return router.ServeHTTP
 }
@@ -74,6 +77,19 @@ func (p *playlistServer) HandleMediaPlaylist(res http.ResponseWriter, req *http.
 	}
 
 	servePlaylist(res, req, playlist)
+}
+
+func (p *playlistServer) HandleStatus(res http.ResponseWriter, req *http.Request) {
+	buf, err := json.Marshal(p.ProxyLoader.StatusReport())
+	if err != nil {
+		serveError(res, req, 500, err)
+		return
+	}
+
+	res.Header().Add("Content-Type", "application/json")
+	res.Header().Set("Content-Length", strconv.FormatInt(int64(len(buf)), 10))
+	res.WriteHeader(200)
+	res.Write(buf)
 }
 
 func getRequestIP(req *http.Request, headerName string) string {
@@ -145,7 +161,8 @@ func main() {
 			},
 			config.CacheTTL,
 		),
-		Balancer: balancer,
+		Balancer:    balancer,
+		ProxyLoader: proxyLoader,
 	}
 
 	log.Printf("listening on: %s", config.HTTPAddress)

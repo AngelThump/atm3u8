@@ -65,7 +65,7 @@ func NewConsistentHashBalancer(config ConsistentHashBalancerConfig, proxyEvents 
 func (r *ConsistentHashBalancer) handleProxyEvents(proxyEvents chan *ProxyStatusEvent) {
 	for event := range proxyEvents {
 		switch event.Status {
-		case ProxyStatusOK:
+		case ProxyStatusUp:
 			r.addDomain(event.Domain)
 		case ProxyStatusRemoved:
 			fallthrough
@@ -134,7 +134,7 @@ func (r *ConsistentHashBalancer) removeDomain(domain string) {
 	r.hashRing = filteredHashRing
 	r.hashRingLock.Unlock()
 
-	log.Printf("added %s to router", domain)
+	log.Printf("removed %s from router", domain)
 }
 
 // RouteSegment ...

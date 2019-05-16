@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -32,24 +33,34 @@ type ProxyStatus int64
 func (p ProxyStatus) String() string {
 	switch p {
 	case ProxyStatusAdded:
-		return "Added"
+		return "added"
 	case ProxyStatusDown:
-		return "Down"
-	case ProxyStatusOK:
-		return "OK"
+		return "down"
+	case ProxyStatusUp:
+		return "up"
 	case ProxyStatusRemoved:
-		return "Removed"
+		return "removed"
 	}
 
 	log.Fatal("invalid value for ProxyStatus")
 	return ""
 }
 
+// MarshalJSON ...
+func (p ProxyStatus) MarshalJSON() ([]byte, error) {
+	buf := bytes.Buffer{}
+	buf.WriteByte('"')
+	buf.WriteString(p.String())
+	buf.WriteByte('"')
+
+	return buf.Bytes(), nil
+}
+
 // proxy statuses
 const (
 	ProxyStatusAdded ProxyStatus = iota
 	ProxyStatusDown
-	ProxyStatusOK
+	ProxyStatusUp
 	ProxyStatusRemoved
 )
 
@@ -127,9 +138,9 @@ func (p *ProxyLivenessChecker) Status() ProxyStatus {
 	p.statusLock.Lock()
 	defer p.statusLock.Unlock()
 
-	if p.status == ProxyStatusOK {
+	if p.status == ProxyStatusUp {
 		if p.checkCount < p.config.SuccessThreshold || p.statusStableCount >= p.config.SuccessThreshold {
-			return ProxyStatusOK
+			return ProxyStatusUp
 		}
 
 		return ProxyStatusDown
@@ -139,7 +150,7 @@ func (p *ProxyLivenessChecker) Status() ProxyStatus {
 		return ProxyStatusDown
 	}
 
-	return ProxyStatusOK
+	return ProxyStatusUp
 }
 
 // Start ...
@@ -154,7 +165,7 @@ func (p *ProxyLivenessChecker) Start() {
 		if err != nil {
 			p.updateStatus(ProxyStatusDown)
 		} else {
-			p.updateStatus(ProxyStatusOK)
+			p.updateStatus(ProxyStatusUp)
 		}
 
 		status := p.Status()
@@ -183,6 +194,12 @@ func (p *ProxyLivenessChecker) Stop() {
 	p.stop <- struct{}{}
 }
 
+// ProxyStatusReport ...
+type ProxyStatusReport struct {
+	Name   string      `json:"name"`
+	Status ProxyStatus `json:"status"`
+}
+
 type proxy struct {
 	Domain          string
 	Added           bool
@@ -192,10 +209,11 @@ type proxy struct {
 // ProxyLoader ...
 type ProxyLoader struct {
 	proxyStatusNotifier
-	config  ProxyLoaderConfig
-	ticker  *time.Ticker
-	stop    chan struct{}
-	proxies map[string]*proxy
+	config      ProxyLoaderConfig
+	ticker      *time.Ticker
+	stop        chan struct{}
+	proxiesLock sync.Mutex
+	proxies     map[string]*proxy
 }
 
 // NewProxyLoader ...
@@ -234,6 +252,21 @@ func (p *ProxyLoader) Stop() {
 	p.stop <- struct{}{}
 }
 
+// StatusReport ...
+func (p *ProxyLoader) StatusReport() []*ProxyStatusReport {
+	p.proxiesLock.Lock()
+	defer p.proxiesLock.Unlock()
+
+	statusReport := []*ProxyStatusReport{}
+	for name, proxy := range p.proxies {
+		statusReport = append(statusReport, &ProxyStatusReport{
+			Name:   name,
+			Status: proxy.LivenessChecker.Status(),
+		})
+	}
+	return statusReport
+}
+
 func (p *ProxyLoader) loadSubdomains() ([]string, error) {
 	res, err := http.Get(p.config.API)
 	if err != nil {
@@ -257,6 +290,9 @@ func (p *ProxyLoader) loadSubdomains() ([]string, error) {
 }
 
 func (p *ProxyLoader) updateProxies(subdomains []string) {
+	p.proxiesLock.Lock()
+	defer p.proxiesLock.Unlock()
+
 	addedSubdomains := []string{}
 	subdomainSet := map[string]struct{}{}
 	for _, subdomain := range subdomains {
