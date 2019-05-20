@@ -10,21 +10,12 @@ import (
 	"time"
 )
 
-// LivenessCheckConfig ...
-type LivenessCheckConfig struct {
-	IntervalSeconds  time.Duration `yaml:"intervalSeconds"`
-	URLFormat        string        `yaml:"urlFormat"`
-	SuccessThreshold int64         `yaml:"successThreshold"`
-	FailureThreshold int64         `yaml:"failureThreshold"`
-}
-
 // ProxyLoaderConfig ...
 type ProxyLoaderConfig struct {
-	API                       string              `yaml:"api"`
-	Region                    string              `yaml:"region"`
-	DomainFormat              string              `yaml:"domainFormat"`
-	APIRefreshIntervalSeconds time.Duration       `yaml:"apiRefreshIntervalSeconds"`
-	LivenessCheck             LivenessCheckConfig `yaml:"livenessCheck"`
+	API                       string        `yaml:"api"`
+	Region                    string        `yaml:"region"`
+	DomainFormat              string        `yaml:"domainFormat"`
+	APIRefreshIntervalSeconds time.Duration `yaml:"apiRefreshIntervalSeconds"`
 }
 
 // ProxyStatus ...
@@ -34,10 +25,6 @@ func (p ProxyStatus) String() string {
 	switch p {
 	case ProxyStatusAdded:
 		return "added"
-	case ProxyStatusDown:
-		return "down"
-	case ProxyStatusUp:
-		return "up"
 	case ProxyStatusRemoved:
 		return "removed"
 	}
@@ -59,8 +46,6 @@ func (p ProxyStatus) MarshalJSON() ([]byte, error) {
 // proxy statuses
 const (
 	ProxyStatusAdded ProxyStatus = iota
-	ProxyStatusDown
-	ProxyStatusUp
 	ProxyStatusRemoved
 )
 
@@ -92,108 +77,6 @@ func (p *proxyStatusNotifier) EmitNotification(domain string, status ProxyStatus
 	}
 }
 
-// ProxyLivenessChecker ...
-type ProxyLivenessChecker struct {
-	config         LivenessCheckConfig
-	statusNotifier *proxyStatusNotifier
-	domain         string
-	url            string
-	// ticker            *time.Ticker
-	// stop              chan struct{}
-	statusLock        sync.Mutex
-	status            ProxyStatus
-	statusStableCount int64
-	checkCount        int64
-	lastEmittedStatus ProxyStatus
-}
-
-// NewProxyLivenessChecker ...
-func NewProxyLivenessChecker(config LivenessCheckConfig, statusNotifier *proxyStatusNotifier, domain string) *ProxyLivenessChecker {
-	return &ProxyLivenessChecker{
-		config:         config,
-		statusNotifier: statusNotifier,
-		domain:         domain,
-		url:            fmt.Sprintf(config.URLFormat, domain),
-		// stop:           make(chan struct{}, 1),
-	}
-}
-
-// func (p *ProxyLivenessChecker) updateStatus(status ProxyStatus) {
-// 	p.statusLock.Lock()
-// 	defer p.statusLock.Unlock()
-
-// 	p.checkCount++
-
-// 	if status == p.status {
-// 		p.statusStableCount++
-// 		return
-// 	}
-
-// 	p.status = status
-// 	p.statusStableCount = 1
-// }
-
-// Status ...
-func (p *ProxyLivenessChecker) Status() ProxyStatus {
-	// p.statusLock.Lock()
-	// defer p.statusLock.Unlock()
-
-	// if p.status == ProxyStatusUp {
-	// 	if p.checkCount < p.config.SuccessThreshold || p.statusStableCount >= p.config.SuccessThreshold {
-	// 		return ProxyStatusUp
-	// 	}
-
-	// 	return ProxyStatusDown
-	// }
-
-	// if p.checkCount < p.config.FailureThreshold || p.statusStableCount >= p.config.FailureThreshold {
-	// 	return ProxyStatusDown
-	// }
-
-	return ProxyStatusUp
-}
-
-// Start ...
-// func (p *ProxyLivenessChecker) Start() {
-// 	if p.ticker != nil {
-// 		log.Fatal("liveness checker already started")
-// 	}
-// 	p.ticker = time.NewTicker(p.config.IntervalSeconds * time.Second)
-
-// 	for {
-// 		_, err := http.Head(p.url)
-// 		if err != nil {
-// 			p.updateStatus(ProxyStatusDown)
-// 		} else {
-// 			p.updateStatus(ProxyStatusUp)
-// 		}
-
-// 		status := p.Status()
-// 		if status != p.lastEmittedStatus {
-// 			log.Printf("proxy status for %s changed from %s to %s",
-// 				p.domain,
-// 				p.lastEmittedStatus.String(),
-// 				status.String(),
-// 			)
-
-// 			p.lastEmittedStatus = status
-// 			p.statusNotifier.EmitNotification(p.domain, status)
-// 		}
-
-// 		select {
-// 		case <-p.ticker.C:
-// 		case <-p.stop:
-// 			break
-// 		}
-// 	}
-// }
-
-// Stop ...
-// func (p *ProxyLivenessChecker) Stop() {
-// 	p.ticker.Stop()
-// 	p.stop <- struct{}{}
-// }
-
 // ProxyStatusReport ...
 type ProxyStatusReport struct {
 	Name   string      `json:"name"`
@@ -201,9 +84,7 @@ type ProxyStatusReport struct {
 }
 
 type proxy struct {
-	Domain          string
-	Added           bool
-	LivenessChecker *ProxyLivenessChecker
+	Domain string
 }
 
 // ProxyLoader ...
@@ -250,21 +131,6 @@ func (p *ProxyLoader) Start() {
 func (p *ProxyLoader) Stop() {
 	p.ticker.Stop()
 	p.stop <- struct{}{}
-}
-
-// StatusReport ...
-func (p *ProxyLoader) StatusReport() []*ProxyStatusReport {
-	p.proxiesLock.Lock()
-	defer p.proxiesLock.Unlock()
-
-	statusReport := []*ProxyStatusReport{}
-	for name, proxy := range p.proxies {
-		statusReport = append(statusReport, &ProxyStatusReport{
-			Name:   name,
-			Status: proxy.LivenessChecker.Status(),
-		})
-	}
-	return statusReport
 }
 
 func (p *ProxyLoader) loadSubdomains() ([]string, error) {
@@ -327,22 +193,17 @@ func (p *ProxyLoader) updateProxies(subdomains []string) {
 
 		p.EmitNotification(proxy.Domain, ProxyStatusRemoved)
 
-		// proxy.LivenessChecker.Stop()
 		delete(p.proxies, subdomain)
 	}
 
 	for _, subdomain := range addedSubdomains {
 		domain := fmt.Sprintf(p.config.DomainFormat, subdomain)
 
-		livenessChecker := NewProxyLivenessChecker(p.config.LivenessCheck, &p.proxyStatusNotifier, domain)
-		// go livenessChecker.Start()
-
 		proxy := &proxy{
-			Domain:          domain,
-			LivenessChecker: livenessChecker,
+			Domain: domain,
 		}
 		p.proxies[subdomain] = proxy
 
-		p.EmitNotification(proxy.Domain, ProxyStatusUp)
+		p.EmitNotification(proxy.Domain, ProxyStatusAdded)
 	}
 }

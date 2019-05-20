@@ -65,11 +65,9 @@ func NewConsistentHashBalancer(config ConsistentHashBalancerConfig, proxyEvents 
 func (r *ConsistentHashBalancer) handleProxyEvents(proxyEvents chan *ProxyStatusEvent) {
 	for event := range proxyEvents {
 		switch event.Status {
-		case ProxyStatusUp:
+		case ProxyStatusAdded:
 			r.addDomain(event.Domain)
 		case ProxyStatusRemoved:
-			fallthrough
-		case ProxyStatusDown:
 			r.removeDomain(event.Domain)
 		}
 	}
