@@ -125,7 +125,10 @@ func main() {
 	flag.Parse()
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
-	var config AppConfig
+	config := AppConfig{
+		HTTPReadTimeout:  5 * time.Second,
+		HTTPWriteTimeout: 5 * time.Second,
+	}
 	if err := ReadYAMLConfig(configPath, &config); err != nil {
 		log.Fatalf("error reading config: %v", err)
 	}
@@ -154,8 +157,8 @@ func main() {
 	log.Printf("listening on: %s", config.HTTPAddress)
 
 	httpServer := &http.Server{
-		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 5 * time.Second,
+		ReadTimeout:  config.HTTPReadTimeout,
+		WriteTimeout: config.HTTPWriteTimeout,
 		Addr:         config.HTTPAddress,
 		Handler:      server.HandlerFunc(),
 	}

@@ -9,12 +9,14 @@ import (
 
 // AppConfig ...
 type AppConfig struct {
-	HTTPAddress     string            `yaml:"httpAddress"`
-	UpstreamServers []string          `yaml:"upstreamServers"`
-	CacheTTL        time.Duration     `yaml:"cacheTTL"`
-	IPHeaderName    string            `yaml:"ipHeaderName"`
-	CORSOrigins     []string          `yaml:"corsOrigins"`
-	ProxyLoader     ProxyLoaderConfig `yaml:"proxyLoader"`
+	HTTPAddress      string            `yaml:"httpAddress"`
+	HTTPReadTimeout  time.Duration     `yaml:"httpReadTimeout"`
+	HTTPWriteTimeout time.Duration     `yaml:"httpWriteTimeout"`
+	UpstreamServers  []string          `yaml:"upstreamServers"`
+	CacheTTL         time.Duration     `yaml:"cacheTTL"`
+	IPHeaderName     string            `yaml:"ipHeaderName"`
+	CORSOrigins      []string          `yaml:"corsOrigins"`
+	ProxyLoader      ProxyLoaderConfig `yaml:"proxyLoader"`
 }
 
 // ReadYAMLConfig ...
