@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/grafov/m3u8"
@@ -167,5 +168,12 @@ func main() {
 
 	log.Printf("listening on: %s", config.HTTPAddress)
 
-	log.Fatal(http.ListenAndServe(config.HTTPAddress, server.HandlerFunc()))
+	httpServer := &http.Server{
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 5 * time.Second,
+		Addr:         config.HTTPAddress,
+		Handler:      server.HandlerFunc(),
+	}
+
+	log.Fatal(httpServer.ListenAndServe())
 }
