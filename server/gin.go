@@ -29,6 +29,7 @@ func Initalize() {
 			return
 		}
 
+		c.Header("Access-Control-Allow-Origin", "*")
 		c.Header("Content-Encoding", "gzip")
 		c.Header("Vary", "Accept-Encoding")
 
