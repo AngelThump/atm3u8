@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/go-redis/redis"
+	"github.com/go-redis/redis/v8"
 
 	client "github.com/angelthump/atm3u8/client"
 	utils "github.com/angelthump/atm3u8/utils"
