@@ -3,6 +3,7 @@ package server
 import (
 	"log"
 	"net/http"
+	"regexp"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -41,6 +42,8 @@ func Initalize() {
 		//Only count as viewer if 200 status code..
 		if statusCode == 200 {
 			go func(channel string, ip_address string) {
+				regex, _ := regexp.Compile("_.*$")
+				channel = regex.ReplaceAllString(channel, "")
 				err := Rdb.ZAdd(Ctx, channel, &redis.Z{
 					Score:  float64(time.Now().UnixMilli()),
 					Member: ip_address,
