@@ -14,6 +14,10 @@ type ConfigStruct struct {
 	Upstream       string `json:"upstream"`
 	Domain         string `json:"domain"`
 	GinReleaseMode bool   `json:"ginReleaseMode"`
+	Redis          struct {
+		Hostname string `json:"hostname"`
+		Password string `json:"password"`
+	} `json:"redis"`
 }
 
 var Config *ConfigStruct

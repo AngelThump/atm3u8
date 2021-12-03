@@ -19,5 +19,6 @@ func main() {
 	}
 
 	client.Initalize()
+	server.InitalizeRedis()
 	server.Initalize()
 }
