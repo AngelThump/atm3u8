@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -20,9 +21,16 @@ func Initalize() {
 	router := gin.Default()
 	router.SetTrustedProxies([]string{"127.0.0.1"})
 
-	router.GET("/hls/:channel/index.m3u8", func(c *gin.Context) {
+	router.GET("/hls/:channel/:endURL", func(c *gin.Context) {
+		endURL := c.Param("endURL")
+
+		if strings.HasSuffix(endURL, ".m3u8") {
+			c.AbortWithStatus(400)
+			return
+		}
+
 		channel := c.Param("channel")
-		m3u8Bytes, err, statusCode := client.GetM3u8(channel)
+		m3u8Bytes, err, statusCode := client.GetM3u8(channel, endURL)
 		if err != nil {
 			log.Printf("%v", err)
 			if statusCode == 0 {

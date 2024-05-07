@@ -25,9 +25,9 @@ func Initalize() {
 	client = resty.New()
 }
 
-func GetM3u8(channel string) ([]byte, error, int) {
+func GetM3u8(channel string, endURL string) ([]byte, error, int) {
 	resp, _ := client.R().
-		Get("http://" + utils.Config.Upstream + "/hls/" + channel + "/index.m3u8")
+		Get("http://" + utils.Config.Upstream + "/hls/" + channel + "/" + endURL)
 
 	statusCode := resp.StatusCode()
 	if statusCode != 200 {
