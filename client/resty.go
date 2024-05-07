@@ -8,8 +8,8 @@ import (
 	"os"
 
 	utils "github.com/angelthump/atm3u8/utils"
+	"github.com/bluenviron/gohlslib/pkg/playlist"
 	"github.com/go-resty/resty/v2"
-	"github.com/grafov/m3u8"
 )
 
 var hostname string
@@ -35,9 +35,7 @@ func GetM3u8(channel string, endURL string) ([]byte, error, int) {
 		return nil, errors.New(string(resp.Body())), statusCode
 	}
 
-	buffer := bytes.NewBuffer(resp.Body())
-
-	parsedM3u8, err := parseM3u8(*buffer, channel)
+	parsedM3u8, err := parseM3u8(resp.Body(), channel)
 	if err != nil {
 		return nil, err, statusCode
 	}
@@ -50,18 +48,29 @@ func GetM3u8(channel string, endURL string) ([]byte, error, int) {
 	return gzipM3u8, nil, statusCode
 }
 
-func parseM3u8(buffer bytes.Buffer, channel string) ([]byte, error) {
-	p, _, err := m3u8.Decode(buffer, true)
+func parseM3u8(m3u8Bytes []byte, channel string) ([]byte, error) {
+	pl, err := playlist.Unmarshal(m3u8Bytes)
 	if err != nil {
 		return nil, errors.New("Failed to decode m3u8..")
 	}
-	for _, segment := range p.(*m3u8.MediaPlaylist).Segments {
-		if segment == nil {
-			continue
+
+	var newM3u8Bytes []byte
+
+	switch pl := pl.(type) {
+	case *playlist.Media:
+		for _, seg := range pl.Segments {
+			if seg == nil {
+				continue
+			}
+			seg.URI = "https://" + hostname + "." + utils.Config.Domain + "/hls/" + channel + "/" + seg.URI
 		}
-		segment.URI = "https://" + hostname + "." + utils.Config.Domain + "/hls/" + channel + "/" + segment.URI
+		newM3u8Bytes, err = pl.Marshal()
+		if err != nil {
+			return nil, errors.New("Failed to Marshal m3u8..")
+		}
 	}
-	return p.Encode().Bytes(), nil
+
+	return newM3u8Bytes, nil
 }
 
 func gZip(data []byte) (compressedData []byte, err error) {
