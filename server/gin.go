@@ -24,7 +24,7 @@ func Initalize() {
 	router.GET("/hls/:channel/:endURL", func(c *gin.Context) {
 		endURL := c.Param("endURL")
 
-		if strings.HasSuffix(endURL, ".m3u8") {
+		if !strings.HasSuffix(endURL, ".m3u8") {
 			c.AbortWithStatus(400)
 			return
 		}
