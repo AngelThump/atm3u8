@@ -68,6 +68,8 @@ func parseM3u8(m3u8Bytes []byte, channel string) ([]byte, error) {
 		if err != nil {
 			return nil, errors.New("Failed to Marshal m3u8..")
 		}
+	default:
+		newM3u8Bytes = m3u8Bytes
 	}
 
 	return newM3u8Bytes, nil
